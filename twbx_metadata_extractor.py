@@ -16,7 +16,7 @@ def simplify_federated_name(raw_field):
 
     # Remove outer brackets if present
     raw_field = raw_field.strip('[]')
-
+    
     # Match inner part: [federated.xxx].[prefix:FieldName:maybeAlias]
     # Extract prefix and field name
     match = re.search(r'\.\[(?:mn|attr|agg|dim|meas|none):([^:\]]+)', raw_field)
@@ -75,33 +75,64 @@ def parse_twb(twb_path):
     for ws in soup.find_all("worksheet"):
         ws_name = ws.get("name")
         row_fields, col_fields, filter_fields = [], [], []
+
+        # Find the view section which contains shelves
+        view = ws.find('view')
+        if not view:
+            continue
+
         # Collect shelf data
-        for shelf in ws.find_all('shelf'):
-            shelf_name = shelf.get('name', '').lower()
+        # Process rows and columns shelves
+        for shelf_type in ['rows', 'columns']:
+            # Look for shelf in the style or view section
+            shelf = view.find('style') and view.find('style').find(shelf_type)
+            if not shelf:
+                # Fallback: check directly under view or worksheet
+                shelf = view.find(shelf_type) or ws.find(shelf_type)
+            
+            fields = []
+            if shelf and shelf.text.strip():
+                # Split the shelf content by spaces or commas to extract field names
+                #field_tokens = shelf.text.replace('[', '').replace(']', '').split()
+                field_tokens = shelf.text.split()
+                for token in field_tokens:
+                    if token and token not in ['{', '}', ',']:
+                        clean_field_name = simplify_federated_name(token)
+                        
+                        readable_field_name = friendly_names.get(clean_field_name, clean_field_name)
+                        if shelf_type == 'rows':
+                            row_fields.append(readable_field_name)
+                        elif shelf_type == 'columns':
+                            col_fields.append(readable_field_name)
 
-            # Match shelves flexibly
-            if 'row' in shelf_name:
-                target = row_fields
-            elif 'column' in shelf_name:
-                target = col_fields
-            else:
-                target = None
-
-            # Parse <field> entries
-            if target is not None:
-                for field in shelf.find_all(['field', 'tableau-field']):
-                    raw_name = field.get('name')
-                    if raw_name:
-                        clean = resolve_friendly_name(raw_name, friendly_names)
-                        target.append(clean)
-
-                # Parse <encoding><expression> entries
-                for encoding in shelf.find_all('encoding'):
-                    for expr in encoding.find_all('expression'):
-                        if expr.get('class') == 'column':
-                            raw_expr = expr.get('value')
-                            clean = resolve_friendly_name(raw_expr, friendly_names)
-                            target.append(clean)
+            
+            # Also check for columns with field references
+            for column in ws.find_all('column'):
+                if column.get('name') and column.get('role') in ['measure', 'dimension']:
+                    #field_name = column.get('name').strip('[]')
+                    field_name = column.get('name')
+                    # Check if column is used in rows or columns shelf
+                    if field_name in shelf.text if shelf else False:
+                        #clean_field_name = simplify_federated_name(field_name)
+                        clean_field_name = resolve_friendly_name(field_name, friendly_names)
+                        readable_field_name = friendly_names.get(clean_field_name, clean_field_name)
+                        if shelf_type == 'rows':
+                            row_fields.append(readable_field_name)
+                        elif shelf_type == 'columns':
+                            col_fields.append(readable_field_name)
+                                        
+                # Handle calculated fields
+                if column.find('calculation'):
+                    calc = column.find('calculation')
+                    formula = calc.get('formula', '')
+                    if shelf_type == 'rows':
+                        row_fields.append(f"Calculated: {formula}")
+                    elif shelf_type == 'columns':
+                        col_fields.append(f"Calculated: {formula}")
+            
+            # Remove duplicates while preserving order
+            row_fields = list(dict.fromkeys(row_fields))
+            col_fields = list(dict.fromkeys(col_fields))
 
         for flt in ws.find_all('filter'):
             field_name = flt.get('field') or flt.get('column')
@@ -157,6 +188,7 @@ def parse_twb(twb_path):
                 for ref in refs:
                     metadata["lineage"].append({
                         "calculated_field": field["name"],
+                        "caption": field["caption"],
                         "depends_on": ref,
                         "datasource": ds_info["name"]
                     })
@@ -204,5 +236,5 @@ def extract_tableau_metadata(file_path):
 
 # === Run the script ===
 if __name__ == "__main__":
-    tableau_file_path = "Your twb or twbx"
+    tableau_file_path = "C:/Users/cheng/Documents/Python Scripts/sample.twbx"
     extract_tableau_metadata(tableau_file_path)  # or .twb
