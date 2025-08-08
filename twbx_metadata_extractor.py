@@ -152,7 +152,23 @@ def parse_twb(twb_path):
 
     # Dashboards
     for db in soup.find_all("dashboard"):
-        metadata["dashboards"].append(db.get("name"))
+        dashboard_name = db.get("name") if db.has_attr("name") else "Unnamed Dashboard"
+        worksheet_names = set()  # Use a set to avoid duplicates
+        for zone in db.find_all("zone"):
+            if not zone:
+                continue
+            
+            # Check for worksheet reference in either 'name' or 'worksheet' attribute
+            if zone.has_attr("type") and zone["type"] in ["worksheet", "floating"]:
+                if zone.has_attr("worksheet"):
+                    worksheet_names.add(zone["worksheet"])
+                elif zone.has_attr("name"):
+                    worksheet_names.add(zone["name"])
+        
+        metadata["dashboards"].append({
+        "dashboard": dashboard_name,
+        "worksheets": list(worksheet_names)
+        })
 
     # Data Sources and Fields
     for ds in soup.find_all("datasource"):
@@ -221,7 +237,7 @@ def export_to_excel(metadata, output_file="tableau_metadata.xlsx"):
     with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
         pd.DataFrame(metadata["data_sources"]).to_excel(writer, sheet_name="Datasources", index=False)
         pd.DataFrame(metadata["worksheets"]).to_excel(writer, sheet_name="Worksheets", index=False)
-        pd.DataFrame(metadata["dashboards"], columns=["Dashboard Name"]).to_excel(writer, sheet_name="Dashboards", index=False)
+        pd.DataFrame(metadata["dashboards"]).to_excel(writer, sheet_name="Dashboards", index=False)
         pd.DataFrame(metadata["parameters"]).to_excel(writer, sheet_name="Parameters", index=False)
         pd.DataFrame(metadata["fields"]).to_excel(writer, sheet_name="Fields", index=False)
         pd.DataFrame(metadata["calculated_fields"]).to_excel(writer, sheet_name="Calculated Fields", index=False)
