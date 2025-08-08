@@ -112,7 +112,7 @@ def parse_twb(twb_path):
                     #field_name = column.get('name').strip('[]')
                     field_name = column.get('name')
                     # Check if column is used in rows or columns shelf
-                    if field_name in shelf.text if shelf else False:
+                    if shelf and field_name in shelf.text:
                         #clean_field_name = simplify_federated_name(field_name)
                         clean_field_name = resolve_friendly_name(field_name, friendly_names)
                         readable_field_name = friendly_names.get(clean_field_name, clean_field_name)
@@ -157,11 +157,14 @@ def parse_twb(twb_path):
     # Data Sources and Fields
     for ds in soup.find_all("datasource"):
         ds_info = {
-            "name": ds.get("name"),
-            "caption": ds.get("caption"),
-            "connections": [conn.attrs for conn in ds.find_all('connection')],
-            "custom_sql": [rel.get('text') for rel in ds.find_all('relation', {'type': 'text'})]
-        }
+        "name": ds.get("name"),
+        "caption": ds.get("caption"),
+        "connections": [conn.attrs for conn in ds.find_all('connection')],
+        "custom_sql": [
+            rel.get('text') 
+            for rel in ds.find_all('relation', attrs={'type': 'text'})
+        ]
+    }
         for col in ds.find_all("column"):
             field = {
                 "name": col.get("name"),
