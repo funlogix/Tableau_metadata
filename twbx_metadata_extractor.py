@@ -56,11 +56,11 @@ def parse_twb(twb_path):
 
     # Worksheets
     # First collect reader friendly names for shelf data in worksheets
-    friendly_names = {}
-    for col in soup.find_all('column'): 
-        raw = col.get('name') 
-        label = col.get('caption') or col.get('alias') or raw 
-        friendly_names[raw] = label
+    # friendly_names = {}
+    # for col in soup.find_all('column'): 
+    #     raw = col.get('name') 
+    #     label = col.get('caption') or col.get('alias') or raw 
+    #     friendly_names[raw] = label
     
     friendly_names = {}
     for col in soup.find_all('column'):
