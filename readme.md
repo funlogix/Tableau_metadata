@@ -7,7 +7,8 @@ A Python tool to extract and document metadata from Tableau `.twb` and `.twbx` w
 ## Features
 
 - Extracts metadata from `.twb` and `.twbx` files
-- Lists worksheets, dashboards, parameters, and fields
+- Lists datasources, worksheets, dashboards, parameters, and fields
+- Lists fields in rows, columns, and filter shelfs in each worksheet 
 - Identifies calculated fields and their formulas
 - Tracks lineage: which fields are referenced in each calculation
 - Exports all metadata to an Excel workbook with separate sheets
